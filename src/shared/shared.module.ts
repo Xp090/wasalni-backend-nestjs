@@ -2,6 +2,9 @@ import { Module, Provider } from '@nestjs/common';
 import { UserService } from './services/user/user.service';
 import { getModelToken, MongooseModule } from '@nestjs/mongoose';
 import { DriverSchema, RiderSchema, UserSchema } from './models/user';
+import { MapsService } from './services/maps/maps.service';
+import { RideRequestSchema } from './models/ride-request';
+import { TripSchema } from './models/trip';
 
 export const userDiscriminatorProviders: Provider[] = [
   {
@@ -23,11 +26,28 @@ export const userDiscriminatorProviders: Provider[] = [
       {
         name: 'User',
         schema: UserSchema
-      }
+      },
+      {
+        name: 'RideRequest',
+        schema: RideRequestSchema
+      },
+      {
+        name: 'Trip',
+        schema: TripSchema
+      },
     ])
   ],
-  providers:[UserService, ...userDiscriminatorProviders],
-  exports: [UserService, MongooseModule, ...userDiscriminatorProviders]
+  providers:[
+    UserService,
+    MapsService,
+    ...userDiscriminatorProviders
+  ],
+  exports: [
+    UserService,
+    MongooseModule,
+    MapsService,
+    ...userDiscriminatorProviders
+  ]
 })
 export class SharedModule {}
 
