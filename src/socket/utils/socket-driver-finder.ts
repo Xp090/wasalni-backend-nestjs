@@ -1,4 +1,4 @@
-import { DriverDocument, } from '../../shared/models/user';
+import { DriverDocument } from '../../shared/models/user';
 import { TripDocument, TripDocumentPopulated } from '../../shared/models/trip';
 import {
   RideDriverResponse,
@@ -9,6 +9,9 @@ import { Subject } from 'rxjs';
 import { SocketStateService } from '../services/socket-state.service';
 import { Model } from 'mongoose';
 import { GeoPointDB, LngLat } from '../../shared/models/location';
+import { UserService } from '../../shared/services/user/user.service';
+import { RideRequestService } from '../../shared/services/ride-request/ride-request.service';
+import { TripService } from '../../shared/services/trip/trip.service';
 
 
 export class DriverFinder {
@@ -29,15 +32,15 @@ export class DriverFinder {
   public config: DriverFinderConfig = null;
 
   constructor(private socketStateService: SocketStateService,
-              private driverModel: Model<DriverDocument>,
-              private rideRequestModel: Model<RideRequestDocument>,
-              private tripModel: Model<TripDocument>) {
+              private userService: UserService,
+              private rideRequestService: RideRequestService,
+              private tripService: TripService) {
 
   }
 
 
   find(rideRequest: RideRequest, config: DriverFinderConfig) {
-    this.initFinding(rideRequest,config).then();
+    this.initFinding(rideRequest, config).then();
     return this._tripRideRequest$.asObservable();
   }
 
@@ -49,25 +52,25 @@ export class DriverFinder {
   }
 
   protected async initFinding(rideRequest: RideRequest, config: DriverFinderConfig) {
-    this.config = config
-    this.sentRideRequest = await this.rideRequestModel.create(rideRequest);
+    this.config = config;
+    this.sentRideRequest = await this.rideRequestService.createRideRequest(rideRequest);
     this.availableDrivers = await this.getDriversDocuments({
       startPoint: rideRequest.rider.location,
       maxDistance: config.maxDistance,
-      maxDrivers: config.maxDrivers
+      maxDrivers: config.maxDrivers,
     });
-   return this.tryNextDrivers();
+    return this.tryNextDrivers();
   }
 
   protected async getDriversDocuments(options: DriversQueryOptions) {
-    return this.driverModel.find({
+    return this.userService.getDrivers({
       location: {
         $nearSphere: {
           $geometry: options.startPoint,
-          $maxDistance: options.maxDistance
-        }
-      }
-    }).limit(options.maxDrivers).exec()
+          $maxDistance: options.maxDistance,
+        },
+      },
+    }, options.maxDrivers);
   }
 
   protected async tryNextDrivers() {
@@ -85,7 +88,6 @@ export class DriverFinder {
 
     }
   }
-
 
 
   protected sendRequests(drivers: DriverDocument[]) {
@@ -148,9 +150,8 @@ export class DriverFinder {
     this.sentRideRequest.requestStatus = RideDriverResponse.RequestAcceptedByDriver;
     this.sentRideRequest.driver = acceptedDriver;
     this.sentRideRequest.save();
-    const trip = await this.tripModel.create({ rideRequest: this.sentRideRequest });
-    await trip.populate('rideRequest.rider').populate('rideRequest.driver').execPopulate();
-    this._tripRideRequest$.next(trip as TripDocumentPopulated);
+    const trip = await this.tripService.createTrip(this.sentRideRequest);
+    this._tripRideRequest$.next(trip);
     this._tripRideRequest$.complete();
 
   }

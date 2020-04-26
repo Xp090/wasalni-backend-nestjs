@@ -1,5 +1,3 @@
-export {} // This will turn this into a module. Don't forget it!
-
 import { Document, DocumentQuery, mquery, Model, Promise, SaveOptions } from 'mongoose';
 import { from, Observable } from 'rxjs';
 declare module 'mongoose' {
@@ -38,3 +36,5 @@ Model.prototype.createAsObservable = function() {
 Document.prototype.saveAsObservable = function(options?: SaveOptions) {
  return from(this.save.apply(this,arguments))
 }
+
+export {} // This will turn this into a module. Don't forget it!

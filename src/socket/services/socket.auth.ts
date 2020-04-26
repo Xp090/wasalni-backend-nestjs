@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { Server } from 'socket.io';
-import * as  jwtAuth from 'socketio-jwt-auth'
+import * as  jwtAuth from 'socketio-jwt-auth';
 import { SESSION_SECRET } from '../../secrets';
 import { UserService } from '../../shared/services/user/user.service';
+import { UserDocument } from '../../shared/models/user';
+import { SocketStateService } from './socket-state.service';
+
 @Injectable()
 export class SocketAuth {
-  constructor(private userService: UserService) {
+  constructor(private userService: UserService,
+              private socketStateService: SocketStateService) {
   }
 
 
@@ -18,12 +22,18 @@ export class SocketAuth {
         const user = await this.userService.findUserById(token._id);
         if (user) {
           return done(null, user);
-        }else{
-          done({error:"USER_NOT_FOUND"});
+        } else {
+          done({ error: 'USER_NOT_FOUND' });
         }
       } catch (error) {
         done(error);
       }
     }));
+
+    server.use((socket, next) => {
+      const user: UserDocument = socket.request.user;
+      socket.request.socketState = this.socketStateService.get(user.id);
+      next();
+    });
   }
 }

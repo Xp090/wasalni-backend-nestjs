@@ -1,6 +1,7 @@
 import * as mongoose from "mongoose";
 
 import {RideRequestDocument, RideRequestSchema, RideRequestDocumentPopulated} from "./ride-request";
+import { InjectModel } from '@nestjs/mongoose';
 
 export enum TripStatus {
     DriverOnTheWayForPickUpPoint = 'DriverOnTheWayForPickUpPoint',
@@ -49,3 +50,5 @@ export const TripSchema = new mongoose.Schema({
 export interface TripEconomy {
     cost: number;
 }
+
+export const InjectTripModel = () => InjectModel('Trip')

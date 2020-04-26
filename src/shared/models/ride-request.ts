@@ -33,8 +33,8 @@ export interface RideRequestDocument extends mongoose.Document {
     driver: mongoose.Types.ObjectId | DriverDocument
 }
 export interface RideRequestDocumentPopulated extends RideRequestDocument {
-    rider: RiderDocument,
-    driver: DriverDocument
+   rider: RiderDocument,
+   driver: DriverDocument
 }
 
 

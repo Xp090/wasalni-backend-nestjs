@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import {  UserDocument } from '../../models/user';
-import { Model } from 'mongoose';
+import { DriverDocument, UserDocument } from '../../models/user';
+import { FilterQuery, Model } from 'mongoose';
+import { InjectDBModel } from '../../db/decorations';
+import { DBModel } from '../../db/collections';
 
 @Injectable()
 export class UserService {
 
-  constructor(@InjectModel('User') private userModel: Model<UserDocument>) {
+  constructor(@InjectDBModel(DBModel.User) private userModel: Model<UserDocument>,
+              @InjectDBModel(DBModel.Driver) private driverModel: Model<DriverDocument>) {
 
   }
 
@@ -34,6 +36,10 @@ export class UserService {
     }catch (e) {
       throw e
     }
+  }
+
+  getDrivers(conditions: FilterQuery<DriverDocument>,limit: number) {
+    return this.driverModel.find(conditions).limit(limit).exec()
   }
 
 }

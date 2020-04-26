@@ -6,21 +6,24 @@ import { Model } from "mongoose";
 import { DriverDocument } from '../../shared/models/user';
 import { RideRequestDocument } from '../../shared/models/ride-request';
 import { TripDocument, TripDocumentPopulated } from '../../shared/models/trip';
+import { UserService } from '../../shared/services/user/user.service';
+import { RideRequestService } from '../../shared/services/ride-request/ride-request.service';
+import { TripService } from '../../shared/services/trip/trip.service';
 
 @Injectable()
 export class SocketUtilsService {
 
   constructor(
     private socketStateService: SocketStateService,
-    @InjectModel('Driver') private driverModel: Model<DriverDocument>,
-    @InjectModel('RideRequest') private rideRequestModel: Model<RideRequestDocument>,
-    @InjectModel('Trip') private tripModel: Model<TripDocument>,
+    private userService: UserService,
+    private rideRequestService: RideRequestService,
+    private tripService: TripService,
   ) {
 
   }
 
   public createDriverFinder() {
-    return new DriverFinder(this.socketStateService,this.driverModel,this.rideRequestModel,this.tripModel)
+    return new DriverFinder(this.socketStateService,this.userService,this.rideRequestService,this.tripService)
   }
 
   public updateTripForSocketState(userId: string, trip: TripDocumentPopulated) {

@@ -11,7 +11,7 @@ import { Server, Socket } from 'socket.io';
 import { JwtAuthGuard, JwtStrategy } from '../api/auth/jwt-strategy.passport';
 import { SocketAuth } from './services/socket.auth';
 import { Logger, UseGuards } from '@nestjs/common';
-import { SocketRider, SocketUser } from './utils/socket.decorators';
+import { SocketState, SocketUser } from './utils/socket.decorators';
 import { RiderDocument, UserDocument } from '../shared/models/user';
 import { GeoPointDB, LngLat } from '../shared/models/location';
 import { SocketEventName } from './declarations/socket-events.names';
@@ -21,6 +21,7 @@ import { SocketEventsService } from './services/socket-events.service';
 import { SocketUtilsService } from './services/socket-utils.service';
 import { tap } from 'rxjs/operators';
 import { GeoPointPipe } from '../shared/pipes/geo-point.pipe';
+import { SocketStateContainer } from './handler/socket-event.handler';
 
 @WebSocketGateway()
 export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect{
@@ -39,20 +40,22 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
   @SubscribeMessage(SocketEventName.UpdateLocation)
   updateUserLocation(@ConnectedSocket() client: Socket,
-                     @MessageBody(GeoPointPipe) data : GeoPointDB,
-                     @SocketUser() user: UserDocument) {
-    user.location = data; //todo set location directly
+                     @MessageBody() data : LngLat,
+                     @SocketUser() user: UserDocument,
+                     @SocketState() socketState: SocketStateContainer) {
+
+    user.location = GeoPointDB.create(data) ;
     user.save();
-    if (handler.currentTrip && handler.user.type == "Driver") {
-      const riderHandler = UsersSocketHandlers.get(handler.currentTrip.rideRequest.rider.id);
-      riderHandler?.sendDriverLocationToRider(location);
+    if (user.isUserDriver() && socketState?.currentTrip) {
+      this.socketEventsService.
+      sendDriverLocationToRider(socketState.currentTrip.rideRequest.rider.id,data)
     }
   }
 
   @SubscribeMessage(SocketEventName.RiderFindDriverRequest)
   riderFindDriverRequest(@ConnectedSocket() client: Socket,
                      @MessageBody() data:RideRequest,
-                     @SocketRider() rider: RiderDocument) {
+                     @SocketUser() rider: RiderDocument) {
     data.rider = rider;
     return this.socketEventsService.findDriverForTrip(data)
       .pipe(tap(trip => {
@@ -75,7 +78,6 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   handleDisconnect(client: Socket) {
     const user = client.request.user;
     Logger.log(`${user.type} ${user.email} Disconnected`)
-    console.log(user.type ,client.id, "Disconnected")
     this.socketStateService.remove(client);
   }
 

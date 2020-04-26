@@ -5,9 +5,12 @@ import { RideRequest, RideRequestDocument } from '../../shared/models/ride-reque
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { DriverDocument, UserDocument } from '../../shared/models/user';
-import { TripDocument } from '../../shared/models/trip';
+import { TripDocument, TripDocumentPopulated } from '../../shared/models/trip';
 import { map } from 'rxjs/operators';
 import { SocketUtilsService } from './socket-utils.service';
+import { Observable } from 'rxjs';
+import { LngLat } from '../../shared/models/location';
+import { handleRetry } from '@nestjs/mongoose/dist/common/mongoose.utils';
 
 @Injectable()
 export class SocketEventsService {
@@ -15,14 +18,11 @@ export class SocketEventsService {
   constructor(
     private socketStateService: SocketStateService,
     private socketUtilsService: SocketUtilsService,
-    @InjectModel('Driver') private driverModel: Model<DriverDocument>,
-    @InjectModel('RideRequest') private rideRequestModel: Model<RideRequestDocument>,
-    @InjectModel('Trip') private tripModel: Model<TripDocument>,
   ) {
 
   }
 
-  findDriverForTrip(rideRequest: RideRequest) {
+  findDriverForTrip(rideRequest: RideRequest): Observable<TripDocumentPopulated> {
     const driverFinder = this.socketUtilsService.createDriverFinder();
     return driverFinder.find(rideRequest, {
       maxDistance: 500000,
@@ -30,7 +30,13 @@ export class SocketEventsService {
       maxRequestsAtOnce: 5,
       tryNextDriverAfterNumOfFailedRequests: 1,
     });
+  }
 
+  sendDriverLocationToRider(riderId: string, lngLat: LngLat) {
+     const riderSocketState = this.socketStateService.get(riderId)
+    riderSocketState.handlers.forEach(handler => {
+      handler.sendDriverLocationToRider(lngLat)
+    })
   }
 
 

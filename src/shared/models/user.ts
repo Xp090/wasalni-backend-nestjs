@@ -2,6 +2,7 @@ import * as bcrypt from 'bcrypt-nodejs';
 import * as crypto from 'crypto';
 import * as mongoose from 'mongoose';
 import { GeoPointDB, geoPointSchema } from './location';
+import { InjectModel } from '@nestjs/mongoose';
 
 type IsUserDriver = (user?: UserDocument)=> user is DriverDocument
 type IsUserRider = (user?: UserDocument)=> user is RiderDocument
@@ -207,3 +208,6 @@ export enum UserType {
   Driver = "Driver"
 }
 
+export const InjectUserModel = () => InjectModel('User')
+export const InjectDriverModel = () => InjectModel('Driver')
+export const InjectRiderModel = () => InjectModel('Rider')

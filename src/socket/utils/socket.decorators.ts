@@ -10,22 +10,21 @@ export const SocketUser = createParamDecorator(
   },
 );
 
-export const SocketDriver = createParamDecorator(
-  (data: string, ctx: ExecutionContext) => {
-    return (ctx.switchToWs().getClient<Socket>().request.user) as DriverDocument
-  },
-);
+// export const SocketDriver = createParamDecorator(
+//   (data: string, ctx: ExecutionContext) => {
+//     return (ctx.switchToWs().getClient<Socket>().request.user) as DriverDocument
+//   },
+// );
+//
+// export const SocketRider = createParamDecorator(
+//   (data: string, ctx: ExecutionContext) => {
+//     return (ctx.switchToWs().getClient<Socket>().request.user) as RiderDocument
+//   },
+// );
 
-export const SocketRider = createParamDecorator(
-  (data: string, ctx: ExecutionContext) => {
-    return (ctx.switchToWs().getClient<Socket>().request.user) as RiderDocument
-  },
-);
 
-
-export const SocketRider = createParamDecorator(
+export const SocketState = createParamDecorator(
   (data: string, ctx: ExecutionContext) => {
-    ctx.
-    return (ctx.switchToWs().getClient<Socket>().request.user) as RiderDocument
+    return (ctx.switchToWs().getClient<Socket>().request.socketState)
   },
 );

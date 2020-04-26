@@ -5,6 +5,9 @@ import { DriverSchema, RiderSchema, UserSchema } from './models/user';
 import { MapsService } from './services/maps/maps.service';
 import { RideRequestSchema } from './models/ride-request';
 import { TripSchema } from './models/trip';
+import { TripService } from './services/trip/trip.service';
+import { DBModel } from './db/collections';
+import { RideRequestService } from './services/ride-request/ride-request.service';
 
 export const userDiscriminatorProviders: Provider[] = [
   {
@@ -24,15 +27,15 @@ export const userDiscriminatorProviders: Provider[] = [
   imports: [
     MongooseModule.forFeature([
       {
-        name: 'User',
+        name: DBModel.User,
         schema: UserSchema
       },
       {
-        name: 'RideRequest',
+        name: DBModel.RideRequest,
         schema: RideRequestSchema
       },
       {
-        name: 'Trip',
+        name: DBModel.Trip,
         schema: TripSchema
       },
     ])
@@ -40,12 +43,16 @@ export const userDiscriminatorProviders: Provider[] = [
   providers:[
     UserService,
     MapsService,
+    RideRequestService,
+    TripService,
     ...userDiscriminatorProviders
   ],
   exports: [
     UserService,
     MongooseModule,
     MapsService,
+    RideRequestService,
+    TripService,
     ...userDiscriminatorProviders
   ]
 })

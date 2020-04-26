@@ -1,56 +1,60 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Socket } from 'socket.io';
 import { SocketEventHandler, SocketStateContainer } from '../handler/socket-event.handler';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from "mongoose";
-import { TripDocument } from '../../shared/models/trip';
 import { UserDocument } from '../../shared/models/user';
+import { TripService } from '../../shared/services/trip/trip.service';
 
 @Injectable()
 export class SocketStateService {
 
-  constructor(
-    @InjectModel('Trip') private tripModel: Model<TripDocument>
-  ) {
+  constructor(private tripService: TripService) {
+
   }
-  private socketState = new Map<string, SocketStateContainer>()
+
+  private socketState = new Map<string, SocketStateContainer>();
 
   public remove(socket: Socket): boolean {
     const user = socket.request.user;
-    const existingState = this.socketState.get(user.id)
+    const existingState = this.socketState.get(user.id);
 
     if (!existingState) {
-      return true
+      return true;
     }
 
     existingState.handlers.delete(socket.id);
 
     if (!existingState.handlers) {
-      this.socketState.delete(user.id)
+      this.socketState.delete(user.id);
     } else {
-      this.socketState.set(user.id, existingState)
+      this.socketState.set(user.id, existingState);
     }
 
-    return true
+    return true;
   }
 
-  public add(socket: Socket): boolean {
+  public async add(socket: Socket): Promise<boolean> {
     const user = socket.request.user;
 
-    let existingState = this.socketState.get(user.id)
+    let existingState = this.socketState.get(user.id);
 
     if (!existingState) {
-      existingState = new SocketStateContainer(user)
+      existingState = new SocketStateContainer(user);
     }
-    existingState.handlers.set(socket.id, new SocketEventHandler(socket))
+    existingState.handlers.set(socket.id, new SocketEventHandler(socket));
 
-    this.socketState.set(user.id, existingState)
+    try {
+      existingState.currentTrip = await this.tripService.getCurrentUserTrip(user.id);
+    }catch (e) {
+      Logger.error(e)
+    }finally {
+      this.socketState.set(user.id, existingState);
+    }
 
-    return true
+    return true;
   }
 
   public get<U = UserDocument>(userId: string): SocketStateContainer<U> {
-    return this.socketState.get(userId) as unknown as SocketStateContainer<U>
+    return this.socketState.get(userId) as unknown as SocketStateContainer<U>;
   }
 
   // public getAll(): SocketEventHandler[] {
