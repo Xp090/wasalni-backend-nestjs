@@ -1,5 +1,6 @@
-import { Controller, Get, Request, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Logger, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-strategy.passport';
+
 
 @Controller('user')
 export class UserController {
@@ -9,5 +10,7 @@ export class UserController {
   getUserData(@Request() req) {
     return req.user;
   }
+
+
 
 }

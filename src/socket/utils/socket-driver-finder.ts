@@ -101,7 +101,7 @@ export class DriverFinder {
 
       if (driverSocketState) {
         driverSocketState.handlers.forEach(driverHandler => {
-          driverHandler.sendTripRequestToDriver().emitThenListenOnce(this.sentRideRequest)
+          driverHandler.sendTripRequestToDriver(this.sentRideRequest)
             .subscribe(didAccept => {
               if (didAccept) {
                 this.onDriverAccepted(driver);

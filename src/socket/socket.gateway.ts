@@ -24,7 +24,7 @@ import { GeoPointPipe } from '../shared/pipes/geo-point.pipe';
 import { SocketStateContainer } from './handler/socket-event.handler';
 
 @WebSocketGateway()
-export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect{
+export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
 
 
   @WebSocketServer() server: Server;
@@ -33,51 +33,60 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     private socketAuth: SocketAuth,
     private socketStateService: SocketStateService,
     private socketEventsService: SocketEventsService,
-    private socketUtilsService: SocketUtilsService
+    private socketUtilsService: SocketUtilsService,
   ) {
 
   }
 
   @SubscribeMessage(SocketEventName.UpdateLocation)
-  updateUserLocation(@ConnectedSocket() client: Socket,
-                     @MessageBody() data : LngLat,
+  updateUserLocation(@MessageBody() data: LngLat,
                      @SocketUser() user: UserDocument,
                      @SocketState() socketState: SocketStateContainer) {
 
-    user.location = GeoPointDB.create(data) ;
+    user.location = GeoPointDB.create(data);
     user.save();
     if (user.isUserDriver() && socketState?.currentTrip) {
-      this.socketEventsService.
-      sendDriverLocationToRider(socketState.currentTrip.rideRequest.rider.id,data)
+      this.socketEventsService.sendDriverLocationToRider(socketState.currentTrip.rideRequest.rider.id, data);
     }
   }
 
   @SubscribeMessage(SocketEventName.RiderFindDriverRequest)
-  riderFindDriverRequest(@ConnectedSocket() client: Socket,
-                     @MessageBody() data:RideRequest,
-                     @SocketUser() rider: RiderDocument) {
+  riderFindDriverRequest(@MessageBody() data: RideRequest,
+                         @SocketUser() rider: RiderDocument) {
     data.rider = rider;
     return this.socketEventsService.findDriverForTrip(data)
       .pipe(tap(trip => {
-        this.socketUtilsService.updateTripForSocketState(trip.rideRequest.driver.id,trip)
-        this.socketUtilsService.updateTripForSocketState(trip.rideRequest.rider.id,trip)
-      }))
+        this.socketUtilsService.updateTripForSocketState(trip.rideRequest.driver.id, trip);
+        this.socketUtilsService.updateTripForSocketState(trip.rideRequest.rider.id, trip);
+      }));
+  }
+
+  @SubscribeMessage(SocketEventName.CancelFindDriverRequest)
+  cancelRiderFindDriverRequest(@SocketState() socketState: SocketStateContainer) {
+    socketState.currentDriverFinder?.cancel();
+    socketState.currentDriverFinder = null;
+  }
+
+  @SubscribeMessage(SocketEventName.TripHandshake)
+  tripHandshake(@SocketState() socketState: SocketStateContainer) {
+
   }
 
 
+  ///////////////////////////////////////////////////////////////////////////
   afterInit(server: Server) {
-   this.socketAuth.authenticate(server);
+    this.socketAuth.authenticate(server);
   }
 
-  handleConnection(client: Socket,  ...args: any[]) {
+  handleConnection(client: Socket, ...args: any[]) {
     const user = client.request.user;
-    Logger.log(`${user.type} ${user.email} Connected`)
+    Logger.log(`${user.type} ${user.email} Connected`);
     this.socketStateService.add(client);
   }
 
   handleDisconnect(client: Socket) {
     const user = client.request.user;
-    Logger.log(`${user.type} ${user.email} Disconnected`)
+    Logger.log(`${user.type} ${user.email} Disconnected`);
     this.socketStateService.remove(client);
   }
 

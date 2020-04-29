@@ -19,7 +19,13 @@ export class SocketAuth {
       algorithm: 'HS256',
     }, async (token: any, done: any) => {
       try {
-        const user = await this.userService.findUserById(token._id);
+        const socketState = this.socketStateService.get(token.id)
+        let user;
+        if (socketState?.user) {
+          user = socketState.user;
+        } else {
+          user = await this.userService.findUserById(token._id);
+        }
         if (user) {
           return done(null, user);
         } else {
