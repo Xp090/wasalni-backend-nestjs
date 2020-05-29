@@ -1,21 +1,25 @@
-import { DriverDocument } from '../../shared/models/user';
+import { DriverDocument, UserDocument, UserType } from '../../shared/models/user';
 import { TripDocument, TripDocumentPopulated } from '../../shared/models/trip';
 import {
   RideDriverResponse,
   RideRequest,
-  RideRequestDocument,
+  RideRequestDocument, RideRequestDocumentPopulated,
 } from '../../shared/models/ride-request';
-import { Subject } from 'rxjs';
+import { EMPTY, merge, NEVER, Observable, of, Subject, throwError } from 'rxjs';
 import { SocketStateService } from '../services/socket-state.service';
 import { Model } from 'mongoose';
 import { GeoPointDB, LngLat } from '../../shared/models/location';
 import { UserService } from '../../shared/services/user/user.service';
 import { RideRequestService } from '../../shared/services/ride-request/ride-request.service';
 import { TripService } from '../../shared/services/trip/trip.service';
+import {
+  TripHandshakeFailedException,
+  TripInvalidHandshakeException,
+} from '../../shared/exceptions/socket/trip.exception';
+import { catchError, endWith, finalize, switchMap, tap, timeout } from 'rxjs/operators';
 
 
 export class DriverFinder {
-
 
   protected _foundDriver: DriverDocument = null;
   protected _isCanceled = false;
@@ -23,13 +27,20 @@ export class DriverFinder {
   protected currentRequests = 0;
   protected failedRequests = 0;
   protected availableDrivers: DriverDocument[];
+  protected lateAcceptDrivers: DriverDocument[];
 
 
-  protected sentRideRequest: RideRequestDocument = null;
+  protected sentRideRequest: RideRequestDocumentPopulated = null;
 
-  protected _tripRideRequest$ = new Subject<TripDocumentPopulated>();
+  protected _tripRideRequest$ = new Subject<RideRequestDocumentPopulated>();
+
+  protected _driverHandShake: boolean = false;
+  protected _riderHandShake: boolean = false;
+
+  protected _trip$ = new Subject<TripDocumentPopulated>();
 
   public config: DriverFinderConfig = null;
+  private _destroyed: Boolean;
 
   constructor(private socketStateService: SocketStateService,
               private userService: UserService,
@@ -39,9 +50,53 @@ export class DriverFinder {
   }
 
 
-  find(rideRequest: RideRequest, config: DriverFinderConfig) {
+  find(rideRequest: RideRequest, config: DriverFinderConfig) : Observable<RideRequestDocumentPopulated> {
     this.initFinding(rideRequest, config).then();
-    return this._tripRideRequest$.asObservable();
+
+    return this._tripRideRequest$.asObservable()
+      .pipe(
+        endWith(EMPTY),
+        switchMap(val => {
+          if (val == EMPTY) {
+            return EMPTY;
+          }else if (val == null) {
+            return NEVER;
+          }
+          return merge(of(val), NEVER.pipe(
+            timeout(this.config.handshakeTimeout),
+            catchError(_ => throwError(new TripHandshakeFailedException()))
+          ));
+        }),
+        finalize(() => this.destroy())
+      ) as Observable<RideRequestDocumentPopulated>;
+  }
+
+
+
+  protected handshake(user: UserDocument) {
+    if (this.isCanceled || !this.isDriverFound || this.handshakeDone ||
+      this.destroyed) {
+      return throwError(new TripInvalidHandshakeException());
+    }
+    if (user.isUserDriver()) {
+      this._driverHandShake = true;
+    } else {
+      this._riderHandShake = true;
+      this._tripRideRequest$.next(null);
+    }
+
+    this.checkIfHandshakeDone();
+    return this._trip$.pipe(
+      timeout(this.config.handshakeTimeout),
+      catchError(err => throwError(new TripHandshakeFailedException())),
+      tap({
+        error: _ => {
+          if (handshakerType == UserType.Rider) {
+            this.destroy()
+          }
+        }
+      }),
+    );
   }
 
 
@@ -53,7 +108,9 @@ export class DriverFinder {
 
   protected async initFinding(rideRequest: RideRequest, config: DriverFinderConfig) {
     this.config = config;
-    this.sentRideRequest = await this.rideRequestService.createRideRequest(rideRequest);
+    const createdRequest = await this.rideRequestService.createRideRequest(rideRequest);
+    createdRequest.rider = rideRequest.rider;
+    this.sentRideRequest = createdRequest as RideRequestDocumentPopulated;
     this.availableDrivers = await this.getDriversDocuments({
       startPoint: rideRequest.rider.location,
       maxDistance: config.maxDistance,
@@ -150,10 +207,9 @@ export class DriverFinder {
     this.sentRideRequest.requestStatus = RideDriverResponse.RequestAcceptedByDriver;
     this.sentRideRequest.driver = acceptedDriver;
     this.sentRideRequest.save();
-    const trip = await this.tripService.createTrip(this.sentRideRequest);
-    this._tripRideRequest$.next(trip);
-    this._tripRideRequest$.complete();
-
+    const driverSocketState = this.socketStateService.get(acceptedDriver.id);
+    driverSocketState.currentDriverFinder = this;
+    this._tripRideRequest$.next(this.sentRideRequest);
   }
 
   protected onFindingFailed(err: any) {
@@ -161,7 +217,14 @@ export class DriverFinder {
       this.sentRideRequest.requestStatus = RideDriverResponse.RequestTimedOut;
       this.sentRideRequest.save();
       this._tripRideRequest$.error(err);
-      this._tripRideRequest$.complete();
+    }
+  }
+
+  protected async checkIfHandshakeDone() {
+    if (this.handshakeDone) {
+      const trip = await this.tripService.createTrip(this.sentRideRequest);
+      this._trip$.next(trip);
+      this._trip$.complete();
     }
   }
 
@@ -176,6 +239,21 @@ export class DriverFinder {
     this.sentRideRequest.requestsSent.set(driver.id, sentRequest);
   }
 
+  public destroy() {
+    this._tripRideRequest$.complete();
+    this._trip$.complete();
+    if (this.foundDriver) {
+      const driverSocketState = this.socketStateService.get(this.foundDriver.id);
+      driverSocketState.currentDriverFinder = null;
+    }
+    if (this.sentRideRequest?.rider) {
+      const riderSocketState = this.socketStateService.get(this.sentRideRequest?.rider.id);
+      riderSocketState.currentDriverFinder = null;
+    }
+
+
+  }
+
   get isDriverFound() {
     return !!this.foundDriver;
   }
@@ -187,6 +265,14 @@ export class DriverFinder {
   get isCanceled() {
     return this._isCanceled;
   }
+
+  get handshakeDone() {
+    return this._driverHandShake && this._riderHandShake;
+  }
+  get destroyed(): Boolean {
+    return this._destroyed;
+  }
+
 }
 
 export interface DriversQueryOptions {
@@ -199,5 +285,8 @@ export interface DriverFinderConfig {
   maxDistance: number,
   maxDrivers: number,
   maxRequestsAtOnce: number,
-  tryNextDriverAfterNumOfFailedRequests: number
+  tryNextDriverAfterNumOfFailedRequests: number,
+  handshakeTimeout: number
 }
+
+

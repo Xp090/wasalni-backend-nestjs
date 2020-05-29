@@ -11,9 +11,10 @@ const isUserDriver: IsUserDriver = function(user?: UserDocument): user is Driver
   return this.type === UserType.Driver
 }
 
-const isUserRider: IsUserDriver = function(user?: UserDocument): user is DriverDocument {
+const isUserRider: IsUserRider = function(user?: UserDocument): user is RiderDocument {
   return this.type === UserType.Driver
 }
+
 
 const options = { discriminatorKey: 'type' };
 
@@ -24,8 +25,8 @@ export type UserDocument = mongoose.Document & {
   passwordResetToken: string;
   passwordResetExpires: Date;
   comparePassword: comparePasswordFunction;
-  isUserDriver: IsUserDriver,
-  isUserRider: IsUserRider
+  isUserDriver(user?: UserDocument): user is DriverDocument,
+  isUserRider(user?: UserDocument): user is RiderDocument,
   tokens: AuthToken[];
   profile: {
     name: string;

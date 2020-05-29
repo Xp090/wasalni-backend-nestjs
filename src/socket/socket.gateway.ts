@@ -5,7 +5,7 @@ import {
   OnGatewayDisconnect,
   OnGatewayInit, SubscribeMessage,
   WebSocketGateway,
-  WebSocketServer,
+  WebSocketServer, WsResponse,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtAuthGuard, JwtStrategy } from '../api/auth/jwt-strategy.passport';
@@ -15,13 +15,14 @@ import { SocketState, SocketUser } from './utils/socket.decorators';
 import { RiderDocument, UserDocument } from '../shared/models/user';
 import { GeoPointDB, LngLat } from '../shared/models/location';
 import { SocketEventName } from './declarations/socket-events.names';
-import { RideRequest } from '../shared/models/ride-request';
+import { RideRequest, RideRequestDocument } from '../shared/models/ride-request';
 import { SocketStateService } from './services/socket-state.service';
 import { SocketEventsService } from './services/socket-events.service';
 import { SocketUtilsService } from './services/socket-utils.service';
-import { tap } from 'rxjs/operators';
+import { map, tap } from 'rxjs/operators';
 import { GeoPointPipe } from '../shared/pipes/geo-point.pipe';
 import { SocketStateContainer } from './handler/socket-event.handler';
+import { Observable } from 'rxjs';
 
 @WebSocketGateway()
 export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
@@ -52,13 +53,18 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
   @SubscribeMessage(SocketEventName.RiderFindDriverRequest)
   riderFindDriverRequest(@MessageBody() data: RideRequest,
-                         @SocketUser() rider: RiderDocument) {
+                         @SocketUser() rider: RiderDocument): Observable<WsResponse<RideRequestDocument>> {
     data.rider = rider;
     return this.socketEventsService.findDriverForTrip(data)
-      .pipe(tap(trip => {
-        this.socketUtilsService.updateTripForSocketState(trip.rideRequest.driver.id, trip);
-        this.socketUtilsService.updateTripForSocketState(trip.rideRequest.rider.id, trip);
-      }));
+      .pipe(map(rideRequest => ({
+        event: SocketEventName.RiderFindDriverRequest,
+        data: rideRequest,
+      })));
+
+    // .pipe(tap(trip => {
+    //   this.socketUtilsService.updateTripForSocketState(trip.rideRequest.driver.id, trip);
+    //   this.socketUtilsService.updateTripForSocketState(trip.rideRequest.rider.id, trip);
+    // }));
   }
 
   @SubscribeMessage(SocketEventName.CancelFindDriverRequest)
@@ -67,8 +73,9 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     socketState.currentDriverFinder = null;
   }
 
-  @SubscribeMessage(SocketEventName.TripHandshake)
-  tripHandshake(@SocketState() socketState: SocketStateContainer) {
+  @SubscribeMessage(SocketEventName.Heartbeat)
+  heartbeat(@MessageBody() type: string,
+            @SocketState() socketState: SocketStateContainer) {
 
   }
 

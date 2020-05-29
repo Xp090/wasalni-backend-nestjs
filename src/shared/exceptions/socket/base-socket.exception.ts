@@ -8,7 +8,8 @@ import {
 import { WsException } from '@nestjs/websockets';
 
 export class BaseSocketException extends WsException {
-  constructor(error: string | object) {
+
+  constructor( error: string | object) {
     super(error)
     // @ts-ignore
     Object.setPrototypeOf(this, this.__proto__);

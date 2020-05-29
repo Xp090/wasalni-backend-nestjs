@@ -8,7 +8,7 @@ import { RideRequest, RideRequestDocument } from '../../shared/models/ride-reque
 import { SocketEmitterFactory } from './socket.emiiter.factory';
 import { SocketEventEmitterListener } from './socket.emitter';
 import { DriverFinder } from '../utils/socket-driver-finder';
-import { catchError, defaultIfEmpty, mergeAll } from 'rxjs/operators';
+import { catchError, defaultIfEmpty, mergeAll, throwIfEmpty } from 'rxjs/operators';
 
 export class SocketEventHandler<U = UserDocument> {
 
@@ -75,9 +75,8 @@ export class SocketStateContainer<U = UserDocument> {
             throw err
           }
         })));
-    return merge(obs).pipe(
-      defaultIfEmpty(throwError( new TimeoutError ())),
-      mergeAll()
+    return merge(...obs).pipe(
+     throwIfEmpty(() => new TimeoutError ())
     );
   }
 }

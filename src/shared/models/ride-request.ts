@@ -9,6 +9,8 @@ export enum RideDriverResponse {
     RequestCanceledByRider = 'RequestCanceledByRider',
     RequestDeclinedByDriver = 'RequestDeclinedByDriver',
     RequestAcceptedByDriver = 'RequestAcceptedByDriver',
+    RequestHandshaking = 'RequestHandshaking',
+    RequestHandshakeFailed = 'RequestHandshakeFailed',
     RequestTimedOut = 'RequestTimedOut'
 }
 
@@ -18,7 +20,8 @@ export interface RideRequest  {
     pickupAddress: string,
     destinationPoint: LngLat,
     destinationAddress: string,
-    rider?: RiderDocument
+    rider?: RiderDocument,
+    driver?: DriverDocument
 }
 
 
