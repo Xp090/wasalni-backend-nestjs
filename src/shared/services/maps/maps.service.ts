@@ -6,7 +6,7 @@ import { GoogleDirectionsResult } from './maps.models';
 @Injectable()
 export class MapsService {
   private googleMapsClient = googleMaps.createClient({
-    key : "AIzaSyBrhVCZX6kw2dKPOegwFhtbCC87XCV-Omw",
+    key : "",
     Promise: Promise,
   });
 
